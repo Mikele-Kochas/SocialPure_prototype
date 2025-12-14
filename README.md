@@ -200,9 +200,6 @@ MIT License - patrz plik LICENSE
 
 Mikele-Kochas
 
-## 🤝 Wkład
-
-Pull requests są mile widziane. Dla znacznych zmian, otwórz issue, aby omówić proponowane zmiany.
 
 ---
 
