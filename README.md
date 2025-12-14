@@ -138,7 +138,6 @@ SocialPure_prototype/
 
 ### 4. **Visualization Module**
 - Wykresy trendów
-- Mapy ciepła kategorii
 - Diagramy sentimentu
 
 ## 📦 Zależności
