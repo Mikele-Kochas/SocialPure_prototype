@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Fixed Top Bar -->
+<div class="results-top-bar">
+    <div class="results-top-bar-left">
+        <h2>{{ job.brand_name }}</h2>
+    <p>Okres: {{ job.start_date }} - {{ job.end_date }}</p>
+    </div>
+    
+    <div class="results-top-bar-center">
+        <div class="status-badge status-{{ job.status }}">
+            {% if job.status == "pending" %}
+                ⏳ Oczekiwanie
+            {% elif job.status == "scraping" %}
+                🔍 Scraping w toku...
+            {% elif job.status == "classifying" %}
+                🤖 Klasyfikacja w toku...
+            {% elif job.status == "completed" %}
+                ✅ Zakończono
+            {% elif job.status == "failed" %}
+                ❌ Błąd
+            {% endif %}
+        </div>
+        
+        {% if job.status not in ["completed", "failed"] %}
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ job.progress * 100 }}%"></div>
+        </div>
+        <p class="progress-text">{{ "%.0f"|format(job.progress * 100) }}% - {{ job.current_step }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="results-top-bar-right">
+        {% if job.status == "completed" and job.category_key %}
+        <a href="{{ url_for('scraping.classification_results', job_id=job.job_id) }}" class="btn-primary">
+            Przejdź do klasyfikacji →
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="results-container">
+    {% if job.status == "failed" %}
+    <div class="error-message" style="width: 100%;">
+        <strong>Błąd:</strong> {{ job.error_message }}
+    </div>
+    {% elif job.status == "completed" %}
+        <!-- Lewa kolumna: Aspekty -->
+        {% if job.category_key %}
+        <div class="results-aspects-panel">
+            <h3>Wygenerowane Aspekty</h3>
+            <div class="aspects-list">
+                {% for category in job.category_key.categories %}
+                <div class="aspect-item" onclick="this.classList.toggle('expanded')">
+                    <div class="aspect-header">
+                        <span>{{ category.get('aspekt', 'Brak nazwy') }}</span>
+                        <span>▼</span>
+                    </div>
+                    <div class="aspect-definition">{{ category.get('definicja', 'Brak definicji') }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Prawa kolumna: Komentarze -->
+        {% if job.scraping_results %}
+        <div class="results-comments-panel">
+            <h3>Komentarze ({{ job.scraping_results|length }})</h3>
+            <div class="comments-list-scrollable">
+                {% for result in job.scraping_results %}
+                <div class="comment-card-compact">
+                    <div class="comment-header-compact">
+                        <span class="comment-number-compact">#{{ loop.index }}</span>
+                        <span>{{ result.source_type }}</span>
+                    </div>
+                    <div class="comment-text-compact">{{ result.text }}</div>
+                    <div class="comment-meta-compact">
+                        <span class="meta-item">👤 {{ result.author or "Nieznany" }}</span>
+                        <span class="meta-item">📍 {{ result.source_type }}</span>
+                        {% if result.url %}
+                        <a href="{{ result.url }}" target="_blank" class="meta-link">🔗 Link</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    {% elif job.status in ["pending", "scraping", "classifying"] %}
+    <div class="loading-message" style="width: 100%;">
+        <p>⏳ Proszę czekać, przetwarzanie może potrwać kilka minut...</p>
+        <p>Strona odświeży się automatycznie po zakończeniu.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Auto-refresh jeśli zadanie nie jest zakończone
+    {% if job.status not in ["completed", "failed"] %}
+    setTimeout(function() {
+        location.reload();
+    }, 5000); // Odśwież co 5 sekund
+    {% endif %}
+</script>
+{% endblock %}

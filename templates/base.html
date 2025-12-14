@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SocialPure{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <h1>SocialPure</h1>
+        </header>
+        
+        <nav class="navbar">
+            <a href="{{ url_for('scraping.index') }}" class="nav-link {% if request.endpoint == 'scraping.index' or request.endpoint == 'scraping.view_results' %}active{% endif %}">
+                🔍 Scraping i Analiza
+            </a>
+            <a href="{{ url_for('scraping.classification') }}" class="nav-link {% if request.endpoint == 'scraping.classification' %}active{% endif %}">
+                📊 Klasyfikacja
+            </a>
+        </nav>
+        
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        
+        <footer class="main-footer">
+            <p>System wykorzystuje Apify i Gemini AI</p>
+        </footer>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

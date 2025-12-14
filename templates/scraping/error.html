@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-container">
+    <h2>❌ Błąd</h2>
+    <p>{{ message }}</p>
+    <a href="{{ url_for('scraping.index') }}" class="btn-primary">Powrót do formularza</a>
+</div>
+{% endblock %}
+

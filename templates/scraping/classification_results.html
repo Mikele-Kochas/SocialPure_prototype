@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Fixed Top Bar -->
+<div class="classification-top-bar">
+    <div class="classification-top-bar-left">
+        <h2>{{ job.brand_name }}</h2>
+        <p>{{ job.scraping_results|length }} komentarzy do klasyfikacji</p>
+    </div>
+    
+    <div class="classification-top-bar-center">
+        {% if job.has_classification() %}
+        <div class="classification-complete-info" style="margin: 0;">
+            ✅ Wszystkie komentarze zostały sklasyfikowane ({{ job.classification_results|length }}/{{ job.scraping_results|length }})
+        </div>
+        {% else %}
+        <div class="auto-classification-info" style="margin: 0;">
+            ⏳ Klasyfikacja uruchomiona automatycznie. Wyniki pojawią się na bieżąco...
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="classification-top-bar-right">
+        {% if job.has_classification() %}
+        <button id="generateReportBtn" class="btn-primary" style="margin-right: 10px;">
+            📊 Generuj raport
+        </button>
+        {% endif %}
+        <button id="resetBtn" class="btn-secondary">
+            🔄 Resetuj
+        </button>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="classification-results-container">
+    <!-- Lewa kolumna: Komentarze -->
+        <div class="comments-panel">
+        <h3>Komentarze</h3>
+            <div class="comments-list" id="commentsList">
+                {% for result in job.scraping_results %}
+                <div class="comment-item-classification" data-comment-id="{{ loop.index0 }}">
+                    <div class="comment-header">
+                        <span class="comment-number">#{{ loop.index }}</span>
+                        <span class="comment-source">{{ result.source_type }}</span>
+                    </div>
+                    <div class="comment-text-classification">{{ result.text }}</div>
+                    <div class="comment-footer">
+                        <span class="comment-author">👤 {{ result.author or "Nieznany" }}</span>
+                        {% if result.url %}
+                        <a href="{{ result.url }}" target="_blank" class="comment-link">🔗 Link</a>
+                        {% endif %}
+                    </div>
+                    <div class="classification-result" id="result-{{ loop.index0 }}">
+                        {% set comment_idx = loop.index0 %}
+                        {% set class_result = None %}
+                        {% if existing_classifications and comment_idx in existing_classifications %}
+                            {% set class_result = existing_classifications[comment_idx] %}
+                        {% endif %}
+                        {% if class_result and class_result.category %}
+                            <span class="category">{{ class_result.category }}</span>
+                            <span class="sentiment sentiment-{{ class_result.sentiment }}">{% if class_result.sentiment == 'pozytywny' %}😊 Pozytywny{% elif class_result.sentiment == 'negatywny' %}😞 Negatywny{% else %}😐 Neutralny{% endif %}</span>
+                        {% else %}
+                            <em>Klasyfikowanie...</em>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+    <!-- Prawa kolumna: Statystyki i Wykresy -->
+        <div class="charts-panel">
+        <h3>Statystyki i Wykresy</h3>
+            
+            <div class="charts-container">
+                <div class="chart-placeholder">
+                    <h4>Rozkład sentymentu</h4>
+                    <canvas id="sentimentChart"></canvas>
+                </div>
+                
+                <div class="chart-placeholder">
+                    <h4>Rozkład kategorii</h4>
+                    <canvas id="categoriesChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="classification-controls">
+            <button id="resetBtnBottom" class="btn-secondary">
+                    🔄 Resetuj i Klasyfikuj Ponownie
+                </button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/classification.js') }}"></script>
+<script>
+    const jobId = "{{ job.job_id }}";
+    const categories = {{ (categories_data or [])|tojson }};
+    const comments = {{ (comments_data or [])|tojson }};
+    const existingClassifications = {{ (existing_classifications or {})|tojson }};
+    
+    console.log('=== INICJALIZACJA CLASSIFICATION ===');
+    console.log('jobId:', jobId);
+    console.log('categories:', categories);
+    console.log('comments:', comments);
+    console.log('existingClassifications:', existingClassifications);
+</script>
+<script>
+    // Wywołaj inicjalizację po załadowaniu classification.js
+    document.addEventListener('DOMContentLoaded', function() {
+        // Poczekaj aż classification.js się załaduje
+        setTimeout(function() {
+            console.log('=== DOMContentLoaded - setTimeout ===');
+            console.log('Inicjalizacja danych...');
+            console.log('Existing classifications:', existingClassifications);
+            console.log('Categories:', categories);
+            console.log('typeof initializeClassificationData:', typeof initializeClassificationData);
+            console.log('typeof classificationData:', typeof classificationData);
+            
+            // Sprawdź czy classificationData jest dostępna
+            if (typeof classificationData !== 'undefined' && typeof initializeClassificationData === 'function') {
+                console.log('classificationData jest dostępna - inicjalizuję');
+                initializeClassificationData(existingClassifications, categories);
+                console.log('Dane zainicjalizowane:', classificationData);
+                
+                // Zaraz potem inicjalizuj UI
+                if (typeof initializeUI === 'function') {
+                    console.log('Wywołuję initializeUI...');
+                    initializeUI(existingClassifications, comments);
+                } else {
+                    console.warn('initializeUI nie jest funkcją, fallback do updateCharts');
+                    if (typeof updateCharts === 'function') {
+                        console.log('Wywołuję updateCharts (fallback)...');
+                        updateCharts();
+                    }
+                }
+            } else {
+                console.warn('classificationData nie jest dostępna lub initializeClassificationData nie jest funkcją');
+                console.warn('typeof classificationData:', typeof classificationData);
+                console.warn('typeof initializeClassificationData:', typeof initializeClassificationData);
+            }
+        }, 500);  // Zwiększony timeout - czekaj na pełne załadowanie classification.js
+        
+        // Obsługa przycisku generowania raportu
+        const generateReportBtn = document.getElementById('generateReportBtn');
+        if (generateReportBtn) {
+            generateReportBtn.addEventListener('click', async function() {
+                const btn = this;
+                const originalText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = '⏳ Generowanie...';
+                
+                try {
+                    const response = await fetch(`/api/generate-report/${jobId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        if (data.report_url) {
+                            // Raport już istnieje
+                            window.location.href = data.report_url;
+                        } else {
+                            // Raport generowany - przekieruj po chwili
+                            btn.textContent = '✅ Generowanie rozpoczęte';
+                            setTimeout(() => {
+                                window.location.href = `/report/${jobId}`;
+                            }, 2000);
+                        }
+                    } else {
+                        alert('Błąd: ' + (data.error || 'Nie udało się wygenerować raportu'));
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }
+                } catch (error) {
+                    console.error('Błąd:', error);
+                    alert('Błąd połączenia z serwerem');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

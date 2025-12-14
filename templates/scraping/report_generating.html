@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="report-generating-container">
+    <div class="generating-message">
+        <h2>⏳ Generowanie raportu...</h2>
+        <p>Raport jest generowany w tle. Proszę odświeżyć stronę za chwilę.</p>
+        <p>Proces może potrwać kilka minut w zależności od ilości danych.</p>
+        
+        <div class="loading-spinner" style="margin: 30px auto; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        
+        <div style="margin-top: 30px;">
+            <a href="{{ url_for('scraping.classification_results', job_id=job_id) }}" class="btn-secondary">
+                ← Powrót do klasyfikacji
+            </a>
+            <button onclick="location.reload()" class="btn-primary" style="margin-left: 10px;">
+                🔄 Odśwież stronę
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.report-generating-container {
+    max-width: 800px;
+    margin: 100px auto;
+    text-align: center;
+}
+
+.generating-message {
+    background: white;
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.generating-message h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.generating-message p {
+    color: #7f8c8d;
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Auto-refresh co 10 sekund */
+</style>
+
+<script>
+    // Auto-refresh co 10 sekund
+    setTimeout(function() {
+        location.reload();
+    }, 10000);
+</script>
+{% endblock %}
+
