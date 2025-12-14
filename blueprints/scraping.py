@@ -30,6 +30,35 @@ logger = LoggerService()
 # Thread pool dla długotrwałych zadań
 executor = ThreadPoolExecutor(max_workers=2)
 
+def load_job_from_anywhere(job_id: str):
+    """Próbuje wczytać zadanie z pamięci, SQLite lub JSON (fallback)"""
+    # 1. Sprawdź pamięć
+    job = job_storage.get(job_id)
+    if job:
+        return job
+    
+    # 2. Sprawdź SQLite
+    try:
+        job = storage_service.db.load_job(job_id)
+        if job:
+            job_storage.save(job)  # Załaduj do cache
+            return job
+    except:
+        pass
+    
+    # 3. Fallback do JSON (dla migracji)
+    try:
+        filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
+        if os.path.exists(filepath):
+            job = storage_service.load_job_from_json(filepath)
+            if job:
+                job_storage.save(job)  # Załaduj do cache i SQLite
+                return job
+    except:
+        pass
+    
+    return None
+
 def run_classification_all(job_id: str):
     """Funkcja uruchamiana w tle: klasyfikuje wszystkie komentarze"""
     job = job_storage.get(job_id)
@@ -246,18 +275,7 @@ def start_scraping():
 @scraping_bp.route('/results/<job_id>')
 def view_results(job_id: str):
     """Wyświetla wyniki zadania"""
-    job = job_storage.get(job_id)
-    
-    # Jeśli nie ma w pamięci, spróbuj wczytać z JSON
-    if not job:
-        try:
-            filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-            if os.path.exists(filepath):
-                job = storage_service.load_job_from_json(filepath)
-                # Załaduj do pamięci
-                job_storage.save(job)
-        except:
-            pass
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return render_template('scraping/error.html', message="Zadanie nie znalezione"), 404
@@ -289,18 +307,7 @@ def classification():
 @scraping_bp.route('/classification/<job_id>')
 def classification_results(job_id: str):
     """Wyświetla klasyfikację dla wybranego zadania"""
-    job = job_storage.get(job_id)
-    
-    # Jeśli nie ma w pamięci, spróbuj wczytać z JSON
-    if not job:
-        try:
-            filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-            if os.path.exists(filepath):
-                job = storage_service.load_job_from_json(filepath)
-                # Załaduj do pamięci
-                job_storage.save(job)
-        except:
-            pass
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return render_template('scraping/error.html', message="Zadanie nie znalezione"), 404
@@ -368,11 +375,11 @@ def classify_comment_api():
         return jsonify({"error": "Brak kategorii do klasyfikacji"}), 400
     
     try:
-        job = job_storage.get(job_id)
-        if not job:
-            return jsonify({"error": "Zadanie nie znalezione"}), 404
-        
-        # Przygotuj klucz kategorii
+    job = load_job_from_anywhere(job_id)
+    if not job:
+        return jsonify({"error": "Zadanie nie znalezione"}), 404
+    
+    # Przygotuj klucz kategorii
         category_key_text = json.dumps(categories, ensure_ascii=False, indent=2)
         
         # Prompt dla klasyfikacji
@@ -444,20 +451,37 @@ Nie dodawaj żadnych innych wyjaśnień, tylko czysty JSON."""
 @scraping_bp.route('/api/status/<job_id>')
 def get_status(job_id: str):
     """API: Status zadania (JSON)"""
-    job = job_storage.get(job_id)
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return jsonify({"error": "Job not found"}), 404
     
-        return jsonify({
-            "job_id": job.job_id,
-            "status": job.status,
-            "current_step": job.current_step,
-            "progress": job.progress,
-            "results_count": len(job.scraping_results),
-            "categories_count": len(job.category_key.categories) if job.category_key else 0,
-            "error_message": job.error_message
-        })
+    return jsonify({
+        "job_id": job.job_id,
+        "status": job.status,
+        "current_step": job.current_step,
+        "progress": job.progress,
+        "results_count": len(job.scraping_results),
+        "categories_count": len(job.category_key.categories) if job.category_key else 0,
+        "error_message": job.error_message
+    })
+
+@scraping_bp.route('/api/classification-status/<job_id>')
+def get_classification_status(job_id: str):
+    """API: Status klasyfikacji zadania (JSON)"""
+    job = load_job_from_anywhere(job_id)
+    
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    
+    return jsonify({
+        "job_id": job.job_id,
+        "status": job.status,
+        "has_classification": job.has_classification(),
+        "classification_count": len(job.classification_results),
+        "total_comments": len(job.scraping_results),
+        "classification_results": job.classification_results
+    })
 
 @scraping_bp.route('/load-from-json', methods=['POST'])
 def load_from_json():
@@ -494,7 +518,7 @@ def get_saved_jobs():
 @scraping_bp.route('/api/classify-all/<job_id>', methods=['POST'])
 def classify_all_api(job_id: str):
     """API: Uruchamia klasyfikację wszystkich komentarzy"""
-    job = job_storage.get(job_id)
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -514,7 +538,7 @@ def classify_all_api(job_id: str):
 @scraping_bp.route('/api/reset-classification/<job_id>', methods=['POST'])
 def reset_classification_api(job_id: str):
     """API: Resetuje klasyfikację zadania"""
-    job = job_storage.get(job_id)
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -551,17 +575,7 @@ def convert_classification_results_to_list(job: ScrapingJob) -> list[Classificat
 def generate_report_background(job_id: str):
     """Funkcja uruchamiana w tle: generuje raport"""
     try:
-        job = job_storage.get(job_id)
-        
-        # Jeśli nie ma w pamięci, wczytaj z JSON
-        if not job:
-            try:
-                filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-                if os.path.exists(filepath):
-                    job = storage_service.load_job_from_json(filepath)
-                    job_storage.save(job)
-            except:
-                pass
+        job = load_job_from_anywhere(job_id)
         
         if not job:
             logger.add_log(f"Nie można wygenerować raportu - zadanie {job_id} nie znalezione", "ERROR")
@@ -601,17 +615,7 @@ def generate_report_background(job_id: str):
 @scraping_bp.route('/api/generate-report/<job_id>', methods=['POST'])
 def generate_report_api(job_id: str):
     """API: Uruchamia generowanie raportu"""
-    job = job_storage.get(job_id)
-    
-    # Jeśli nie ma w pamięci, wczytaj z JSON
-    if not job:
-        try:
-            filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-            if os.path.exists(filepath):
-                job = storage_service.load_job_from_json(filepath)
-                job_storage.save(job)
-        except:
-            pass
+    job = load_job_from_anywhere(job_id)
     
     if not job:
         return jsonify({"error": "Zadanie nie znalezione"}), 404
@@ -646,14 +650,7 @@ def view_report(job_id: str):
     
     if not os.path.exists(report_path):
         # Sprawdź czy zadanie istnieje
-        job = job_storage.get(job_id)
-        if not job:
-            try:
-                filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-                if os.path.exists(filepath):
-                    job = storage_service.load_job_from_json(filepath)
-            except:
-                pass
+        job = load_job_from_anywhere(job_id)
         
         if not job:
             return render_template('scraping/error.html', message="Zadanie nie znalezione"), 404
@@ -670,14 +667,7 @@ def view_report(job_id: str):
         html_content = f.read()
     
     # Pobierz dane zadania dla kontekstu
-    job = job_storage.get(job_id)
-    if not job:
-        try:
-            filepath = os.path.join(storage_service.data_dir, f"job_{job_id}.json")
-            if os.path.exists(filepath):
-                job = storage_service.load_job_from_json(filepath)
-        except:
-            pass
+    job = load_job_from_anywhere(job_id)
     
     return render_template('scraping/report.html', 
                          report_html=html_content, 

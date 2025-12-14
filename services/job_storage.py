@@ -1,9 +1,10 @@
 import threading
 from typing import Dict, Optional
 from models.scraping_job import ScrapingJob
+from services.database_service import DatabaseService
 
 class JobStorageService:
-    """Serwis przechowywania zadań - in-memory storage"""
+    """Serwis przechowywania zadań - używa SQLite"""
     _instance = None
     
     def __new__(cls):
@@ -16,27 +17,46 @@ class JobStorageService:
         if self._initialized:
             return
         
-        self._jobs: Dict[str, ScrapingJob] = {}
+        self.db = DatabaseService()
+        self._cache: Dict[str, ScrapingJob] = {}  # Cache dla szybkiego dostępu
         self._lock = threading.Lock()
         self._initialized = True
     
     def save(self, job: ScrapingJob) -> None:
-        """Zapisuje zadanie"""
+        """Zapisuje zadanie do bazy danych i cache"""
         with self._lock:
-            self._jobs[job.job_id] = job
+            self.db.save_job(job)
+            self._cache[job.job_id] = job
     
     def get(self, job_id: str) -> Optional[ScrapingJob]:
-        """Pobiera zadanie po ID"""
+        """Pobiera zadanie po ID (najpierw z cache, potem z bazy)"""
         with self._lock:
-            return self._jobs.get(job_id)
+            # Sprawdź cache
+            if job_id in self._cache:
+                return self._cache[job_id]
+            
+            # Wczytaj z bazy
+            job = self.db.load_job(job_id)
+            if job:
+                self._cache[job_id] = job
+            return job
     
     def update(self, job: ScrapingJob) -> None:
         """Aktualizuje istniejące zadanie"""
         with self._lock:
-            if job.job_id in self._jobs:
-                self._jobs[job.job_id] = job
+            self.db.save_job(job)  # INSERT OR REPLACE
+            self._cache[job.job_id] = job
     
     def get_all(self) -> list[ScrapingJob]:
-        """Zwraca wszystkie zadania"""
+        """Zwraca wszystkie zadania z bazy danych"""
         with self._lock:
-            return list(self._jobs.values())
+            jobs = self.db.get_all_jobs()
+            # Zaktualizuj cache
+            for job in jobs:
+                self._cache[job.job_id] = job
+            return jobs
+    
+    def clear_cache(self):
+        """Czyści cache (użyteczne po długim czasie)"""
+        with self._lock:
+            self._cache.clear()

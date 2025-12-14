@@ -47,6 +47,8 @@ env/
 logs/
 data/*.json
 data/reports/
+data/*.db
+data/*.db-journal
 static/charts/
 
 # Cache
