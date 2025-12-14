@@ -41,14 +41,26 @@ class ScrapingResult:
         # Wyciągnij autora
         author = item.get("author") or item.get("authorName") or ""
         
-        # Wyciągnij datę
+        # Wyciągnij datę - Apify zwraca "time" lub "createdAt"
         date = None
-        if item.get("createdAt"):
+        date_str = item.get("time") or item.get("createdAt") or item.get("timestamp")
+        
+        if date_str:
             try:
                 from dateutil import parser as date_parser
-                date = date_parser.parse(item.get("createdAt"))
-            except:
-                pass
+                # Jeśli to timestamp (liczba), konwertuj
+                if isinstance(date_str, (int, float)):
+                    date = datetime.fromtimestamp(date_str)
+                else:
+                    # Jeśli to string, parsuj
+                    date = date_parser.parse(str(date_str))
+            except Exception as e:
+                # Fallback: spróbuj z timestamp jeśli jest dostępny
+                if item.get("timestamp"):
+                    try:
+                        date = datetime.fromtimestamp(item.get("timestamp"))
+                    except:
+                        pass
         
         # Określ typ źródła
         source_type = "post"

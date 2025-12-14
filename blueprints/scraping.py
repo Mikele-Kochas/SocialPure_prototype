@@ -180,7 +180,12 @@ def run_scraping_and_generate_key(job_id: str, brand_name: str):
             job.update_progress(step, progress)
             job_storage.update(job)
         
-        scraping_results = scraping_orchestrator.execute_scraping_job(brand_name, progress_callback)
+        scraping_results = scraping_orchestrator.execute_scraping_job(
+            brand_name, 
+            start_date=job.start_date,
+            end_date=job.end_date,
+            progress_callback=progress_callback
+        )
         job.scraping_results = scraping_results
         job.update_progress("Scraping zakończony", 0.3)
         job_storage.update(job)
@@ -375,11 +380,11 @@ def classify_comment_api():
         return jsonify({"error": "Brak kategorii do klasyfikacji"}), 400
     
     try:
-    job = load_job_from_anywhere(job_id)
-    if not job:
-        return jsonify({"error": "Zadanie nie znalezione"}), 404
-    
-    # Przygotuj klucz kategorii
+        job = load_job_from_anywhere(job_id)
+        if not job:
+            return jsonify({"error": "Zadanie nie znalezione"}), 404
+        
+        # Przygotuj klucz kategorii
         category_key_text = json.dumps(categories, ensure_ascii=False, indent=2)
         
         # Prompt dla klasyfikacji
