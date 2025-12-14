@@ -138,7 +138,6 @@ SocialPure_prototype/
 
 ### 4. **Visualization Module**
 - Wykresy trendów
-- Mapy ciepła kategorii
 - Diagramy sentimentu
 
 ## 📦 Zależności
@@ -200,9 +199,6 @@ MIT License - patrz plik LICENSE
 
 Mikele-Kochas
 
-## 🤝 Wkład
-
-Pull requests są mile widziane. Dla znacznych zmian, otwórz issue, aby omówić proponowane zmiany.
 
 ---
 
