@@ -88,14 +88,32 @@ SocialPure_prototype/
    ```bash
    pip install -r requirements.txt
    ```
+3. **Skonfiguruj zmienne środowiskowe**
 
-3. **Skonfiguruj zmienne środowiskowe:**
-   ```bash
-   cp .env.example .env
-   ```
-   Edytuj `.env` i uzupełnij:
-   - `APIFY_API_TOKEN` - token z https://apify.com
-   - `GEMINI_API_KEY` - klucz API z https://aistudio.google.com
+Skopiuj plik z przykładową konfiguracją i utwórz plik `.env` (użyj komendy odpowiedniej dla Twojego terminala):
+
+### Linux / macOS / Git Bash / WSL
+```bash
+cp .env.example .env
+```
+
+### Windows — PowerShell
+```powershell
+Copy-Item .env.example .env
+```
+
+### Windows — CMD
+```cmd
+copy .env.example .env
+```
+
+Następnie edytuj plik `.env` i uzupełnij wymagane wartości:
+```env
+APIFY_API_TOKEN=your_token_here
+GEMINI_API_KEY=your_key_here
+```
+
+> **Uwaga:** Plik `.env` zwykle nie powinien trafiać do repozytorium (zawiera sekrety). W repozytorium trzymaj tylko `.env.example` z nazwami zmiennych (bez wartości).
 
 4. **Uruchom aplikację:**
    ```bash
