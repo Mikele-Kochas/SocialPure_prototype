@@ -166,10 +166,9 @@ class GeminiService:
     ) -> dict:
         """
         Weryfikuje post przez Gemini Flash Lite:
-        - Czy data jest rzeczywiście w zakresie (na podstawie treści)
-        - Czy post jest na temat marki
+        - Sprawdza czy post jest na temat marki
         
-        Zwraca: {"valid": bool, "reason": str, "corrected_date": str lub None}
+        Zwraca: {"valid": bool, "reason": str}
         """
         prompt = f"""Jesteś ekspertem weryfikującym posty z mediów społecznych.
 
@@ -177,38 +176,28 @@ class GeminiService:
 {post_text}
 </post>
 
-<metadane>
-Data posta (z API): {post_date}
-Zakres dat do analizy: {start_date} - {end_date}
-Marka/organizacja: {brand_name}
-</metadane>
+<marka>
+{brand_name}
+</marka>
 
-Wykonaj DWA sprawdzenia:
+Wykonaj JEDNO sprawdzenie:
 
-1. **Weryfikacja daty:**
-   - Na podstawie treści posta, określ rzeczywistą datę publikacji
-   - Porównaj z zakresem {start_date} - {end_date}
-   - Jeśli data z API ({post_date}) nie pasuje do treści, użyj daty wywnioskowanej z treści
-
-2. **Weryfikacja relevancy:**
-   - Czy post dotyczy marki/organizacji "{brand_name}"?
-   - Czy jest to opinia, komentarz lub wzmianka o tej marce?
-   - Czy post jest na temat (nie spam, nie reklama innej marki)?
+**Weryfikacja relevancy:**
+- Czy post dotyczy marki/organizacji "{brand_name}"?
+- Czy jest to opinia, komentarz lub wzmianka o tej marce?
+- Czy post jest na temat (nie spam, nie reklama innej marki)?
 
 Zwróć wynik w formacie JSON:
 {{
   "valid": true/false,
-  "date_in_range": true/false,
   "relevant_to_brand": true/false,
-  "corrected_date": "YYYY-MM-DD" lub null,
   "reason": "Krótkie wyjaśnienie decyzji"
 }}
 
 Post jest WAŻNY jeśli:
-- Data jest w zakresie {start_date} - {end_date} (lub można ją wywnioskować z treści)
 - Post dotyczy marki "{brand_name}"
 
-Jeśli którykolwiek warunek nie jest spełniony, ustaw "valid": false."""
+Jeśli warunek nie jest spełniony, ustaw "valid": false."""
 
         try:
             response = self.flash_lite_model.generate_content(prompt)
@@ -221,26 +210,20 @@ Jeśli którykolwiek warunek nie jest spełniony, ustaw "valid": false."""
             if isinstance(result, dict):
                 return {
                     "valid": result.get("valid", False),
-                    "date_in_range": result.get("date_in_range", False),
                     "relevant_to_brand": result.get("relevant_to_brand", False),
-                    "corrected_date": result.get("corrected_date"),
                     "reason": result.get("reason", "Brak wyjaśnienia")
                 }
             else:
                 # Jeśli nie dict, załóż że nieprawidłowy
                 return {
                     "valid": False,
-                    "date_in_range": False,
                     "relevant_to_brand": False,
-                    "corrected_date": None,
                     "reason": "Błąd parsowania odpowiedzi Gemini"
                 }
         except Exception as e:
             # W przypadku błędu, zaakceptuj post (fail-safe)
             return {
                 "valid": True,
-                "date_in_range": True,
                 "relevant_to_brand": True,
-                "corrected_date": None,
                 "reason": f"Błąd weryfikacji (zaakceptowano): {str(e)}"
             }

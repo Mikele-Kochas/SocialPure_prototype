@@ -368,18 +368,6 @@ class ScrapingOrchestrator:
                 )
                 
                 if verification.get("valid", False):
-                    # Jeśli Gemini podał poprawioną datę, zaktualizuj
-                    if verification.get("corrected_date"):
-                        try:
-                            corrected_dt = datetime.strptime(verification["corrected_date"], "%Y-%m-%d")
-                            result.date = corrected_dt
-                            self.logger.add_log(
-                                f"Poprawiono datę posta: {post_date_str} -> {verification['corrected_date']}",
-                                "INFO"
-                            )
-                        except:
-                            pass
-                    
                     verified_results.append(result)
                 else:
                     rejected_count += 1
